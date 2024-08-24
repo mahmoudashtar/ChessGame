@@ -21,17 +21,13 @@ Player playerBlk;
 Player playerWht;
 bool whiteTurn = true;
 bool quitBtn = false; 
+
 // to implement aanpassan 
 Square lastFromSq; 
 Square lastToSq;
 ChessPiece lastPiece; 
-
-
-
 std:: vector<std:: vector<Square>> gameHis;
-
 std:: vector<std:: vector<Square>> boardHis;
-
 std:: vector<int> HR_X_MOVES = {1, 1, 2, 2, -1, -1, -2, -2};
 std:: vector<int> HR_Y_MOVES = {2, -2, 1, -1, 2, -2, 1, -1};
 
@@ -274,7 +270,6 @@ std:: vector<Square> calcBishupMoves(Square sq){
     ChessPiece myBi = sq.piece;
     int myX = sq.getX();
     int myY = sq.getY();
-   
     for(int j = 1; j < 8; j ++){
         int ind = findSquare(myX + j , myY + j);
         if(ind == -1) break;
@@ -387,9 +382,6 @@ std:: vector<Square> calcHorseMoves(Square sq){
 }
 
 void move(Square oldSq, Square newSq){
-    // lastOldSq = oldSq;
-    // lastNewSq = newSq;
-
     int oldInd = findSquare(oldSq.getX(), oldSq.getY());
     int newInd = findSquare(newSq.getX(), newSq.getY());
     if(myB.at(oldInd).piece.getType() == PAWN && myB.at(newInd).isEmpty() && (myB.at(oldInd).getX() != myB.at(newInd).getX())){
@@ -459,7 +451,7 @@ std:: vector<Square>  calcAllMoves(pieceColor color){ //calc all moves of a play
     return allMoves; 
 }
 
-bool isChecked(pieceColor color){// if the given color(parameter) is checking the opponent
+bool isChecked(pieceColor color){// to is if a player is checked
     std:: vector<Square> allMoves = calcAllMoves(color);
     for(int i = 0; i < allMoves.size(); i++){
         int ind = findSquare(allMoves.at(i).getX(), allMoves.at(i).getY());
@@ -477,7 +469,7 @@ bool isChecked(pieceColor color){// if the given color(parameter) is checking th
 }
 
 
-std:: vector<Square> legalise(std:: vector<Square> moves,  Square curPiece){ // I ONLY KKNOW THE SQUARES I CAN MOVE TO BUT I DONT KNOW WITH WHICH PIECE I CAN MOVE TO THESE SQUARES
+std:: vector<Square> legalise(std:: vector<Square> moves,  Square curPiece){ 
     pieceColor color = curPiece.piece.getColor();
     std:: vector<Square> legalMoves;
     for(int i = 0; i < moves.size(); i++){
