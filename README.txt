@@ -1,4 +1,5 @@
 ************** READ ME FILE *********************
+NOTE: this game was made to reuse the skills I learnt in the first year of my computer science major. (uploaded on GitHub much later).
 To run: 
 - run the command "g++ chess.cpp chessPiece.cpp  player.cpp square.cpp -o game" and then "./game". OR
 - run "game.exe" file
