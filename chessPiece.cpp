@@ -9,7 +9,6 @@ pieceType ChessPiece :: getType(){ return type;}
 pieceColor ChessPiece :: getColor(){ return color;}
 
 
-
 void ChessPiece :: pieceInfo(){
     std:: cout<< "pieceInfo:\n";
     (color == WHITE)? std:: cout<< "color: WHITE, " : std:: cout<< "color: black, ";

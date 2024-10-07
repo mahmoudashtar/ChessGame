@@ -7,38 +7,33 @@
 #include"chessPiece.h"
 #include"player.h"
 
-
-
-std:: vector<Square> myB(64); 
-bool whiteIsChecked = false;
-bool blackIsChecked = false;
-std:: vector<Square> whiteMoves(0); //  squares controlled by White
-std:: vector<Square> blackMoves(0); //    square controlled by Black
+// ******** GLOBAL VARS *********
+std:: vector<Square> ChessBoard(64); // chess board contains 64 squares
 Square lastOldSq; 
 Square lastNewSq;
-Player Winner;
 Player playerBlk;
 Player playerWht;
 bool whiteTurn = true;
 bool quitBtn = false; 
+bool blackIsChecked = false;
+bool whiteIsChecked = false;
 
-// to implement aanpassan 
+// required to implement En Passant 
 Square lastFromSq; 
 Square lastToSq;
 ChessPiece lastPiece; 
-std:: vector<std:: vector<Square>> gameHis;
-std:: vector<std:: vector<Square>> boardHis;
+std:: vector<std:: vector<Square>> boardHistory;
 std:: vector<int> HR_X_MOVES = {1, 1, 2, 2, -1, -1, -2, -2};
 std:: vector<int> HR_Y_MOVES = {2, -2, 1, -1, 2, -2, 1, -1};
 
-//util func
-void printSqVec(std::vector<Square> sq){
+//******* until func ********
+void printSqVec(std::vector<Square> sq){ // print information of each square (DEBUG FUNCTION)
     for(int i = 0; i < sq.size();i++){
         sq.at(i).printSquareInf();
     }
 }
 
-void printMsg(std:: string msg){
+void printMsg(std:: string msg){ //pretty message printing
     for(int i = 0; i < msg.size() + 4; i++){
         std:: cout << "-";
     }
@@ -49,18 +44,29 @@ void printMsg(std:: string msg){
     std:: cout<< "\n\n";
 }
 
-void initBoard(){
+bool searchInArr(char letter, std:: string arr){
+    for(int i = 0; i < arr.size(); i++){
+        if(letter == arr[i]){
+            return true;
+        }
+    }
+    return false;
+}
+
+// ************************* //
+
+void initBoard(){// ititiate chess board squares
     for(int j = 0; j < 8; j++){
         for(int i = 0; i < 8; i++){
-            myB.at(i + (j * 8)).setState(true);
-            myB.at(i + (j * 8)).setX(i);
-            myB.at(i + (j * 8)).setY(j);
+            ChessBoard.at(i + (j * 8)).setState(true);
+            ChessBoard.at(i + (j * 8)).setX(i);
+            ChessBoard.at(i + (j * 8)).setY(j);
 
         }
     }
 }
 
-std:: string drawPiece(pieceType type){
+std:: string drawPiece(pieceType type){ 
     std:: string squareStr;
     switch (type)
     {
@@ -83,9 +89,9 @@ std:: string drawPiece(pieceType type){
     return squareStr;
 }
 
-void drawCB(){
+void drawChessBoard(){  
     std:: string boardStr = "  ";
-    int size = sqrt(myB.size());
+    int size = sqrt(ChessBoard.size());
     for(int i = 0; i < size; i++){
         boardStr += "+-----";
     }
@@ -94,16 +100,16 @@ void drawCB(){
         std:: string rowNum = std:: to_string(1 + i);
         boardStr += rowNum + " ";
         for(int j = 0; j < size; j++){
-            if(myB.at(j + (i * 8)).isEmpty()){ boardStr += "|     "; }
+            if(ChessBoard.at(j + (i * 8)).isEmpty()){ boardStr += "|     "; }
             else{ 
-                boardStr += drawPiece(myB.at(j + (i * 8)).piece.getType());
+                boardStr += drawPiece(ChessBoard.at(j + (i * 8)).piece.getType());
             }
         }
         boardStr += "|\n  ";
         for(int j = 0; j < size; j++){ // this might be deleted. maKING square too big makes drawing chess pieces harder
-            if(myB.at(j + (i * 8)).isEmpty()){ boardStr += "|     "; }
+            if(ChessBoard.at(j + (i * 8)).isEmpty()){ boardStr += "|     "; }
             else{ 
-                if(myB.at(j + (i * 8)).piece.getColor() == WHITE){
+                if(ChessBoard.at(j + (i * 8)).piece.getColor() == WHITE){
                     boardStr += "| WTE ";
                 }
                 else { 
@@ -128,7 +134,7 @@ void drawCB(){
     std:: cout<< boardStr << std:: endl;
 }
 
-ChessPiece makePiece(pieceColor color, pieceType type){
+ChessPiece makePiece(pieceColor color, pieceType type){ //creates chess piece
     ChessPiece piece;
     piece.setColor(color);
     piece.setType(type);
@@ -136,52 +142,37 @@ ChessPiece makePiece(pieceColor color, pieceType type){
     return piece;
 }
 
-std:: vector<ChessPiece> makeSet(pieceColor color){
-    std:: vector<ChessPiece> mySet;
-    mySet.push_back(makePiece(color, KING));
-    mySet.push_back(makePiece(color, QUEEN));
-    for(int i = 0; i < 8; i++){
-        mySet.push_back(makePiece(color, PAWN));
-        if(i < 2){
-            mySet.push_back(makePiece(color, ROOK));
-            mySet.push_back(makePiece(color, HORSE));
-            mySet.push_back(makePiece(color, BISHUP));
-        }
-    }
-    return mySet;
-}
-
-void putPieces(){
+void putPieces(){ // orders pieces on boards 
     for(int i = 0; i < 16; i++){
-        if(i == 0 || i ==7) {myB.at(i).piece = makePiece(WHITE, ROOK) ;}
-        else if(i == 1 || i ==6) myB.at(i).piece = makePiece(WHITE, HORSE);
-        else if(i == 2 || i ==5) myB.at(i).piece = makePiece(WHITE, BISHUP);
-        else if(i == 3) myB.at(i).piece = makePiece(WHITE, QUEEN);
-        else if(i == 4) myB.at(i).piece = makePiece(WHITE, KING);
-        else myB.at(i).piece = makePiece(WHITE, PAWN);
-        myB.at(i).setState(false);
+        if(i == 0 || i ==7) {ChessBoard.at(i).piece = makePiece(WHITE, ROOK) ;}
+        else if(i == 1 || i ==6) ChessBoard.at(i).piece = makePiece(WHITE, HORSE);
+        else if(i == 2 || i ==5) ChessBoard.at(i).piece = makePiece(WHITE, BISHUP);
+        else if(i == 3) ChessBoard.at(i).piece = makePiece(WHITE, QUEEN);
+        else if(i == 4) ChessBoard.at(i).piece = makePiece(WHITE, KING);
+        else ChessBoard.at(i).piece = makePiece(WHITE, PAWN);
+        ChessBoard.at(i).setState(false);
     }
     for(int i = 48; i < 64; i++){
-        if(i == 56 || i ==63) myB.at(i).piece = makePiece(BLACK, ROOK);
-        else if(i == 57 || i ==62) myB.at(i).piece = makePiece(BLACK, HORSE);
-        else if(i == 58 || i ==61) myB.at(i).piece = makePiece(BLACK, BISHUP);
-        else if(i == 59) myB.at(i).piece = makePiece(BLACK, QUEEN);
-        else if(i == 60) myB.at(i).piece = makePiece(BLACK, KING);
-        else myB.at(i).piece = makePiece(BLACK, PAWN);
-        myB.at(i).setState(false);
+        if(i == 56 || i ==63) ChessBoard.at(i).piece = makePiece(BLACK, ROOK);
+        else if(i == 57 || i ==62) ChessBoard.at(i).piece = makePiece(BLACK, HORSE);
+        else if(i == 58 || i ==61) ChessBoard.at(i).piece = makePiece(BLACK, BISHUP);
+        else if(i == 59) ChessBoard.at(i).piece = makePiece(BLACK, QUEEN);
+        else if(i == 60) ChessBoard.at(i).piece = makePiece(BLACK, KING);
+        else ChessBoard.at(i).piece = makePiece(BLACK, PAWN);
+        ChessBoard.at(i).setState(false);
     }
 }
 
-int findSquare(int x, int y){
-    for(int i = 0; i < myB.size(); i++){
-        if(myB.at(i).getX() == x && myB.at(i).getY() == y){
+int findSquare(int x, int y){ // returns square index in ChessBoard vector
+    for(int i = 0; i < ChessBoard.size(); i++){
+        if(ChessBoard.at(i).getX() == x && ChessBoard.at(i).getY() == y){
             return i;
         }
     }
     return -1;
 }
 
-bool checkAnpasant(Square mySq){
+bool checkEnpassant(Square mySq){// checks if En Passant rule is applicable 
     if(lastPiece.getType() == PAWN && abs(lastFromSq.getY() - lastToSq.getY()) == 2 && abs(mySq.getX() - lastToSq.getX()) == 1 && abs(mySq.getY()) - abs(lastToSq.getY()) == 0){
         return true;
     }
@@ -194,7 +185,7 @@ std:: vector<Square>  calcPawnMoves(Square sq){
     ChessPiece myPAWN = sq.piece;
     int myY = sq.getY();
     int myX = sq.getX();
-    int sqInd = findSquare( myX, myY);
+    int squareIndex = findSquare( myX, myY);
     int destination = 1;
     if(myPAWN.getColor() == BLACK){ destination = -1; }
    
@@ -202,20 +193,20 @@ std:: vector<Square>  calcPawnMoves(Square sq){
     int secondInd = findSquare(myX, myY + (2 * destination) );
     int thirdInd = findSquare(myX - 1, myY + (1 * destination) );
     int fourthInd = findSquare(myX + 1, myY + (1 * destination) );
-    if(firstInd != -1 && myB.at(firstInd).isEmpty()){
-        moves.push_back(myB.at(firstInd));
-        if(secondInd != -1 && myB.at(secondInd).isEmpty() && ((myY == 1 && destination == 1) ||(myY == 6 && destination == -1) ) ){
-            moves.push_back(myB.at(secondInd));
+    if(firstInd != -1 && ChessBoard.at(firstInd).isEmpty()){
+        moves.push_back(ChessBoard.at(firstInd));
+        if(secondInd != -1 && ChessBoard.at(secondInd).isEmpty() && ((myY == 1 && destination == 1) ||(myY == 6 && destination == -1) ) ){
+            moves.push_back(ChessBoard.at(secondInd));
         }
     }
-    if(thirdInd != -1 && !myB.at(thirdInd).isEmpty() && myB.at(thirdInd).piece.getColor() != myPAWN.getColor()){
-        moves.push_back(myB.at(thirdInd));
+    if(thirdInd != -1 && !ChessBoard.at(thirdInd).isEmpty() && ChessBoard.at(thirdInd).piece.getColor() != myPAWN.getColor()){
+        moves.push_back(ChessBoard.at(thirdInd));
     }
-    if(fourthInd != -1 && !myB.at(fourthInd).isEmpty() && myB.at(fourthInd).piece.getColor() != myPAWN.getColor()){
-        moves.push_back(myB.at(fourthInd));
+    if(fourthInd != -1 && !ChessBoard.at(fourthInd).isEmpty() && ChessBoard.at(fourthInd).piece.getColor() != myPAWN.getColor()){
+        moves.push_back(ChessBoard.at(fourthInd));
     }
-    // to implement aanpassant rule
-    if(checkAnpasant(sq)){
+    // implement En Passant rule
+    if(checkEnpassant(sq)){
         Square newMove = lastToSq;
         int destination = 1;
         if(myPAWN.getColor() == BLACK){ destination = -1;}
@@ -235,25 +226,25 @@ std:: vector<Square> calcRookMoves(Square sq){
         for(int i = 1; i < 8; i ++){
             int ind = findSquare(myX, myY + (i * dest));
             if(ind == -1) break;
-            if(myB.at(ind).isEmpty()){
-                moves.push_back(myB.at(ind));
+            if(ChessBoard.at(ind).isEmpty()){
+                moves.push_back(ChessBoard.at(ind));
             }
-            else if(myB.at(ind).piece.getColor() == myROOK.getColor()){ 
+            else if(ChessBoard.at(ind).piece.getColor() == myROOK.getColor()){ 
                 break; 
             } 
             else{
-                moves.push_back(myB.at(ind)); 
+                moves.push_back(ChessBoard.at(ind)); 
                 break; 
             }
         }
         for(int i = 1; i < 8; i ++){
             int ind = findSquare(myX + (i * dest), myY);
             if(ind == -1) break;
-            if(myB.at(ind).isEmpty()){
-                moves.push_back(myB.at(ind));
+            if(ChessBoard.at(ind).isEmpty()){
+                moves.push_back(ChessBoard.at(ind));
             }
-            else if(myB.at(ind).piece.getColor() != myROOK.getColor()){ 
-                moves.push_back(myB.at(ind));
+            else if(ChessBoard.at(ind).piece.getColor() != myROOK.getColor()){ 
+                moves.push_back(ChessBoard.at(ind));
                 break; 
             } 
             else{ 
@@ -267,17 +258,17 @@ std:: vector<Square> calcRookMoves(Square sq){
 
 std:: vector<Square> calcBishupMoves(Square sq){
     std:: vector<Square> moves(0);
-    ChessPiece myBi = sq.piece;
+    ChessPiece ChessBoardi = sq.piece;
     int myX = sq.getX();
     int myY = sq.getY();
     for(int j = 1; j < 8; j ++){
         int ind = findSquare(myX + j , myY + j);
         if(ind == -1) break;
-        else if(myB.at(ind).isEmpty()) {
-            moves.push_back(myB.at(ind));
+        else if(ChessBoard.at(ind).isEmpty()) {
+            moves.push_back(ChessBoard.at(ind));
         }
-        else if(myB.at(ind).piece.getColor() != myBi.getColor()){
-            moves.push_back(myB.at(ind)); 
+        else if(ChessBoard.at(ind).piece.getColor() != ChessBoardi.getColor()){
+            moves.push_back(ChessBoard.at(ind)); 
             break;
         }
         else{ 
@@ -287,11 +278,11 @@ std:: vector<Square> calcBishupMoves(Square sq){
     for(int j = 1; j < 8; j ++){
         int ind = findSquare(myX + j, myY - j);
         if(ind == -1) break;
-        else if(myB.at(ind).isEmpty()) {
-            moves.push_back(myB.at(ind));
+        else if(ChessBoard.at(ind).isEmpty()) {
+            moves.push_back(ChessBoard.at(ind));
         }
-        else if(myB.at(ind).piece.getColor() != myBi.getColor()){
-            moves.push_back(myB.at(ind)); 
+        else if(ChessBoard.at(ind).piece.getColor() != ChessBoardi.getColor()){
+            moves.push_back(ChessBoard.at(ind)); 
             break;
         }
         else{ 
@@ -301,11 +292,11 @@ std:: vector<Square> calcBishupMoves(Square sq){
     for(int j = 1; j < 8; j ++){
         int ind = findSquare(myX - j, myY - j);
         if(ind == -1) break;
-        else if(myB.at(ind).isEmpty()) {
-            moves.push_back(myB.at(ind));
+        else if(ChessBoard.at(ind).isEmpty()) {
+            moves.push_back(ChessBoard.at(ind));
         }
-        else if(myB.at(ind).piece.getColor() != myBi.getColor()){
-            moves.push_back(myB.at(ind)); 
+        else if(ChessBoard.at(ind).piece.getColor() != ChessBoardi.getColor()){
+            moves.push_back(ChessBoard.at(ind)); 
             break;
         }
         else{ 
@@ -315,11 +306,11 @@ std:: vector<Square> calcBishupMoves(Square sq){
     for(int j = 1; j < 8; j ++){
         int ind = findSquare(myX - j, myY + j);
         if(ind == -1) break;
-        else if(myB.at(ind).isEmpty()) {
-            moves.push_back(myB.at(ind));
+        else if(ChessBoard.at(ind).isEmpty()) {
+            moves.push_back(ChessBoard.at(ind));
         }
-        else if(myB.at(ind).piece.getColor() != myBi.getColor()){
-            moves.push_back(myB.at(ind)); 
+        else if(ChessBoard.at(ind).piece.getColor() != ChessBoardi.getColor()){
+            moves.push_back(ChessBoard.at(ind)); 
             break;
         }
         else{ 
@@ -354,14 +345,14 @@ std:: vector<Square> calcKingMoves(Square sq){
     int ind_6 = findSquare(x , y - 1);
     int ind_7 = findSquare(x - 1, y - 1);
     int ind_8 = findSquare(x + 1, y - 1);
-    if(ind_1 != -1 && (myB.at(ind_1).isEmpty() || myB.at(ind_1).piece.getColor() != myKing.getColor()) ){ moves.push_back(myB.at(ind_1)); }
-    if(ind_2 != -1 && (myB.at(ind_2).isEmpty() || myB.at(ind_2).piece.getColor() != myKing.getColor()) ){ moves.push_back(myB.at(ind_2)); }
-    if(ind_3 != -1 && (myB.at(ind_3).isEmpty() || myB.at(ind_3).piece.getColor() != myKing.getColor()) ){ moves.push_back(myB.at(ind_3)); }
-    if(ind_4 != -1 && (myB.at(ind_4).isEmpty() || myB.at(ind_4).piece.getColor() != myKing.getColor()) ){ moves.push_back(myB.at(ind_4)); }
-    if(ind_5 != -1 && (myB.at(ind_5).isEmpty() || myB.at(ind_5).piece.getColor() != myKing.getColor()) ){ moves.push_back(myB.at(ind_5)); }
-    if(ind_6 != -1 && (myB.at(ind_6).isEmpty() || myB.at(ind_6).piece.getColor() != myKing.getColor()) ){ moves.push_back(myB.at(ind_6)); }
-    if(ind_7 != -1 && (myB.at(ind_7).isEmpty() || myB.at(ind_7).piece.getColor() != myKing.getColor()) ){ moves.push_back(myB.at(ind_7)); }
-    if(ind_8 != -1 && (myB.at(ind_8).isEmpty() || myB.at(ind_8).piece.getColor() != myKing.getColor()) ){ moves.push_back(myB.at(ind_8)); }
+    if(ind_1 != -1 && (ChessBoard.at(ind_1).isEmpty() || ChessBoard.at(ind_1).piece.getColor() != myKing.getColor()) ){ moves.push_back(ChessBoard.at(ind_1)); }
+    if(ind_2 != -1 && (ChessBoard.at(ind_2).isEmpty() || ChessBoard.at(ind_2).piece.getColor() != myKing.getColor()) ){ moves.push_back(ChessBoard.at(ind_2)); }
+    if(ind_3 != -1 && (ChessBoard.at(ind_3).isEmpty() || ChessBoard.at(ind_3).piece.getColor() != myKing.getColor()) ){ moves.push_back(ChessBoard.at(ind_3)); }
+    if(ind_4 != -1 && (ChessBoard.at(ind_4).isEmpty() || ChessBoard.at(ind_4).piece.getColor() != myKing.getColor()) ){ moves.push_back(ChessBoard.at(ind_4)); }
+    if(ind_5 != -1 && (ChessBoard.at(ind_5).isEmpty() || ChessBoard.at(ind_5).piece.getColor() != myKing.getColor()) ){ moves.push_back(ChessBoard.at(ind_5)); }
+    if(ind_6 != -1 && (ChessBoard.at(ind_6).isEmpty() || ChessBoard.at(ind_6).piece.getColor() != myKing.getColor()) ){ moves.push_back(ChessBoard.at(ind_6)); }
+    if(ind_7 != -1 && (ChessBoard.at(ind_7).isEmpty() || ChessBoard.at(ind_7).piece.getColor() != myKing.getColor()) ){ moves.push_back(ChessBoard.at(ind_7)); }
+    if(ind_8 != -1 && (ChessBoard.at(ind_8).isEmpty() || ChessBoard.at(ind_8).piece.getColor() != myKing.getColor()) ){ moves.push_back(ChessBoard.at(ind_8)); }
     return moves;
 }
 
@@ -373,9 +364,9 @@ std:: vector<Square> calcHorseMoves(Square sq){
     for(int i = 0; i < HR_X_MOVES.size(); i++){
         int newX = x + HR_X_MOVES.at(i); 
         int newY = y + HR_Y_MOVES.at(i);
-        int newSqInd = findSquare(newX, newY);
-        if( newSqInd != -1 && (myB.at(newSqInd).isEmpty() || myB.at(newSqInd).piece.getColor() != myColor) ){
-            moves.push_back(myB.at(newSqInd));
+        int newsquareIndex = findSquare(newX, newY);
+        if( newsquareIndex != -1 && (ChessBoard.at(newsquareIndex).isEmpty() || ChessBoard.at(newsquareIndex).piece.getColor() != myColor) ){
+            moves.push_back(ChessBoard.at(newsquareIndex));
         }
     }
     return moves;
@@ -384,27 +375,30 @@ std:: vector<Square> calcHorseMoves(Square sq){
 void move(Square oldSq, Square newSq){
     int oldInd = findSquare(oldSq.getX(), oldSq.getY());
     int newInd = findSquare(newSq.getX(), newSq.getY());
-    if(myB.at(oldInd).piece.getType() == PAWN && myB.at(newInd).isEmpty() && (myB.at(oldInd).getX() != myB.at(newInd).getX())){
+    if(ChessBoard.at(oldInd).piece.getType() == PAWN && ChessBoard.at(newInd).isEmpty() && (ChessBoard.at(oldInd).getX() != ChessBoard.at(newInd).getX())){
         int dest = -1; 
-        if(myB.at(oldInd).piece.getColor() == BLACK){dest = 1;}
-        myB.at(newInd + 8*dest).setState(true);
+        if(ChessBoard.at(oldInd).piece.getColor() == BLACK){dest = 1;}
+        ChessBoard.at(newInd + 8*dest).setState(true);
     }
-    myB.at(newInd).piece = myB.at(oldInd).piece;
-    myB.at(newInd).setState(false);
-    myB.at(oldInd).setState(true);
-    gameHis.push_back(myB);
+    ChessBoard.at(newInd).piece = ChessBoard.at(oldInd).piece;
+    ChessBoard.at(newInd).setState(false);
+    ChessBoard.at(oldInd).setState(true);
+    boardHistory.push_back(ChessBoard);
 }
 
 void setLastMove(Square from, Square to){
-
+    /*
+    this function sets important variables to enable checkEnpassant() 
+    tracking last move is required to know when En Passant rule is aaplicable
+    */ 
     lastFromSq = from;
     lastToSq = to;
-    lastPiece = myB.at(findSquare(to.getX(), to.getY())).piece;
+    lastPiece = ChessBoard.at(findSquare(to.getX(), to.getY())).piece;
 }
 
 void undoMove(){
-    gameHis.pop_back();
-    myB = gameHis.back();
+    boardHistory.pop_back();
+    ChessBoard = boardHistory.back();
 }
 
 std:: vector<Square> calcMoves(Square sq){
@@ -439,9 +433,9 @@ std:: vector<Square> calcMoves(Square sq){
 
 std:: vector<Square>  calcAllMoves(pieceColor color){ //calc all moves of a player
     std:: vector<Square> allMoves(0);
-    for(int i = 0; i < myB.size(); i ++){
-        if(!myB.at(i).isEmpty() && myB.at(i).piece.getColor() == color){
-            std:: vector<Square> pieceMoves = calcMoves(myB.at(i));
+    for(int i = 0; i < ChessBoard.size(); i ++){
+        if(!ChessBoard.at(i).isEmpty() && ChessBoard.at(i).piece.getColor() == color){
+            std:: vector<Square> pieceMoves = calcMoves(ChessBoard.at(i));
             for(int j = 0; j < pieceMoves.size(); j++){
                 allMoves.push_back(pieceMoves.at(j));
             }
@@ -451,15 +445,38 @@ std:: vector<Square>  calcAllMoves(pieceColor color){ //calc all moves of a play
     return allMoves; 
 }
 
-bool isChecked(pieceColor color){// to is if a player is checked
+int chooseMove(std:: vector<Square> moves){
+    int moveNum;
+    std:: cout<< "Choose a move:\n";
+    for(int i = 0; i < moves.size(); i++){
+        char x = moves.at(i).getX() + 97;
+        int y = moves.at(i).getY() + 1;
+        std:: cout<< i << ": " <<  x  << y << std:: endl;
+        if(i == moves.size() -1){
+            std:: cout<< i+1 << ": change piece\n";
+        }
+    }
+    std:: cin>> moveNum; 
+    while(moveNum < 0 || moveNum > moves.size() ){
+        printMsg("GIVE A VALID CHOICE");
+        std:: cin >> moveNum;
+    }
+    return moveNum;
+}
+
+bool isGivingCheck(pieceColor color){// true if a player is checked
     std:: vector<Square> allMoves = calcAllMoves(color);
     for(int i = 0; i < allMoves.size(); i++){
         int ind = findSquare(allMoves.at(i).getX(), allMoves.at(i).getY());
-        if( !myB.at(ind).isEmpty() && 
-            myB.at(ind).piece.getColor() != color && 
-            myB.at(ind).piece.getType() == KING ){
-            if(color == WHITE) blackIsChecked = true;
-            else whiteIsChecked = true;
+        if( !ChessBoard.at(ind).isEmpty() && 
+            ChessBoard.at(ind).piece.getColor() != color && 
+            ChessBoard.at(ind).piece.getType() == KING ){
+            if(color == WHITE){
+                blackIsChecked = true;
+            }
+            else {
+                whiteIsChecked = true;
+            }
             return true;
         }
     }
@@ -467,7 +484,6 @@ bool isChecked(pieceColor color){// to is if a player is checked
     else whiteIsChecked = false;
     return false;
 }
-
 
 std:: vector<Square> legalise(std:: vector<Square> moves,  Square curPiece){ 
     pieceColor color = curPiece.piece.getColor();
@@ -478,37 +494,33 @@ std:: vector<Square> legalise(std:: vector<Square> moves,  Square curPiece){
         int ind = findSquare(x,y);
 
         if(color == WHITE){
-            move(curPiece, myB.at(ind));
-            isChecked(BLACK);
+            move(curPiece, ChessBoard.at(ind));
+            isGivingCheck(BLACK);
             if(!whiteIsChecked){
                 legalMoves.push_back(moves.at(i));
             }
             undoMove();
-            isChecked(BLACK);            
+            isGivingCheck(BLACK);            
         }
         else{
-            move(curPiece, myB.at(ind));
-            isChecked(WHITE);
+            move(curPiece, ChessBoard.at(ind));
+            isGivingCheck(WHITE);
             if(!blackIsChecked){
                 legalMoves.push_back(moves.at(i));
             }
             undoMove();
-            isChecked(WHITE);
+            isGivingCheck(WHITE);
         }
     }
     return legalMoves;
-}
-
-void showWinner(Player winner){
-    printMsg( "\n*********\n*********\n" + winner.getName() + " WON\n*********\n*********");
 }
 
 bool gameOver(){
     std:: vector<Square> allWhiteMoves;
     std:: vector<Square> allBlackMoves;
 
-    for(int i = 0; i < myB.size(); i++){
-        Square sq = myB.at(i);
+    for(int i = 0; i < ChessBoard.size(); i++){
+        Square sq = ChessBoard.at(i);
         if(!sq.isEmpty()){
             std:: vector<Square> moves = calcMoves(sq);
             moves = legalise(moves, sq);
@@ -521,12 +533,12 @@ bool gameOver(){
         }
     }
 
-    if(isChecked(BLACK) && allWhiteMoves.size() == 0 ){
-        showWinner(playerBlk);
+    if(isGivingCheck(BLACK) && allWhiteMoves.size() == 0 ){
+        printMsg("BLACK WINS");
         return true;
 
-    } else if(isChecked(WHITE) && allBlackMoves.size() == 0){
-        showWinner(playerWht);
+    } else if(isGivingCheck(WHITE) && allBlackMoves.size() == 0){
+        printMsg("WHITE WINS");
         return true;
     }
     else {
@@ -535,50 +547,19 @@ bool gameOver(){
 
 }
 
-void promptMove(){
-    std:: string turn = "White To Move  ***  ";
-    if( !whiteTurn){
-        turn = "Black to Move ***";
-    }
-    printMsg( turn + "Choose a piece to move");
-}
-
-bool quitGame(char input){
-    if(input == 'q') {
-        char answer;
-        printMsg( "ARE YOU SURE YOU WANT TO QUIT THE GAME? (type y to quit)");
-        std:: cin >> answer;
-        if(answer == 'y'){
-            std:: cout << "\n********\nQUITING GAME\n********\n";
-            return true;
-        }
-    }
-    return false;
-}
-
-bool checkInbound(char &colLetter, int &col, int &row){
-    if(row < 1 || row > 8 || colLetter < 'a' || colLetter > 'h'){
-            std:: cout << "\nPlease choose a square on the board\n";
-            return false;
-        }
-        row -= 1;
-        col = colLetter - 97;
-    return true;
-}
-
-bool unvalidSq(int sqInd){
-    if(myB.at(sqInd).isEmpty()){
+bool unvalidSq(int squareIndex){ // true if chosen square is empty or has opponents piece
+    if(ChessBoard.at(squareIndex).isEmpty()){
         printMsg("EMPTY SQUARE");
         return true;
     }
     if(whiteTurn){
-        if(myB.at(sqInd).piece.getColor() != WHITE){
+        if(ChessBoard.at(squareIndex).piece.getColor() != WHITE){
             printMsg("must choose a white piece");
             return true;
         }
     }
     else{
-        if(myB.at(sqInd).piece.getColor() != BLACK){
+        if(ChessBoard.at(squareIndex).piece.getColor() != BLACK){
             printMsg("must choose a black piece");
             return true;
         }
@@ -586,69 +567,101 @@ bool unvalidSq(int sqInd){
     return false;
 }
 
-int main(){
-    std:: string nameWhite , nameBlack;
-    printMsg("Enter the names of Player A (white) and B (black)");
-    std:: cin >> nameWhite >> nameBlack;
-    playerWht.setName(nameWhite);
-    playerWht.setColor(WHITE);
-    playerBlk.setName(nameBlack);
-    playerBlk.setColor(BLACK);
-    std:: string myBoard; 
-    initBoard();
-    putPieces();
-    playerWht.setChessSet(makeSet(WHITE));
-    playerBlk.setChessSet(makeSet(BLACK));
-    drawCB();
-    gameHis.push_back(myB);
-    std:: cout<< myBoard << std:: endl;
-    char colLetter;
-    int col;
-    int row; 
-    char quit;
-    while(!gameOver()){
-        promptMove();
-        std:: cin >> colLetter >> row;
-        if(quitGame(colLetter)) break;
-        if(!checkInbound(colLetter, col, row)) continue;
-        int sqInd = findSquare(col, row);
-        if(unvalidSq(sqInd)) continue;
-        
-        std:: vector<Square> moves = calcMoves(myB.at(sqInd));
-        moves = legalise(moves, myB.at(sqInd)); 
-        if(moves.size() == 0){
-            printMsg("THIS PIECE HAS NO MOVES, PLEASE CHOOSE A PIECE THAT HAS MOVES");
-            continue;
-        }
-        std:: cout<< "Choose a move:\n";
-        for(int i = 0; i < moves.size(); i++){
-            char x = moves.at(i).getX() + 97;
-            int y = moves.at(i).getY() + 1;
-            std:: cout<< i << ": " <<  x  << y << std:: endl;
-            if(i == moves.size() -1){
-                std:: cout<< i+1 << ": change piece\n";
+int promptSquare(){ 
+    /*
+     Ensures input validity OR quits game
+     This functions prompts players for to choose a chess piece to move
+     - offers an option to quit game 
+     - ensures input validity 
+     - ensures chosen peice has valid moves
+     */
+    std:: cin.clear();
+    std:: string message = "White To Move  ***  ";
+    if( !whiteTurn){
+        message = "Black to Move *** ";
+    }
+    while(true){
+        printMsg( message + "Choose a piece to move");
+        std:: string input; 
+        std:: cin >> input;
+        if(input == "q" || input == "quit" ){ // quitting option
+            printMsg("Do you want to quit? type 'y' or 'yes' to quit");
+            std:: string answer; 
+            std:: cin >> answer;
+            if(answer == "y"|| answer == "yes"){
+                printMsg("   QUITTING   ");
+                exit(EXIT_SUCCESS);
+            }
+            else{
+                continue;
             }
         }
-        int moveNum; 
-        std:: cin>> moveNum; 
-        if(moveNum == moves.size()){ //change chosen piece 
+        else if(input.size() != 2 || !searchInArr(input[0], "abcdefgh") || !searchInArr(input[1], "12345678") ){ // invalid input
+            printMsg("Choose a valid Square");
             continue;
         }
-        printMsg( "MOVING PIECE");
-        move(myB.at(sqInd), moves.at(moveNum));
-        setLastMove(myB.at(sqInd), moves.at(moveNum));
-        drawCB();
-        if(whiteTurn && isChecked(WHITE)){
-            blackIsChecked = true;
-            printMsg( "*** BLACK CHECKED ***");
+        else{ // valid squares
+            int squareIndex = findSquare(input[0] - 97, std:: stoi(input.substr(1,1)) - 1);
+            return squareIndex;
         }
-        else if(!whiteTurn && isChecked(BLACK)){
-            printMsg( "*** WHITE CHECKED ***");
+    }
+}
+
+void handleChecks(){
+    if(whiteTurn && isGivingCheck(WHITE)){
+        printMsg( "*** BLACK CHECKED ***");
+    }
+    else if(!whiteTurn && isGivingCheck(BLACK)){
+        printMsg( "*** WHITE CHECKED ***");
+    }
+}
+
+void setPlayers(){// take players names and assign chess sets to them
+    std:: string name1, name2; 
+    printMsg("Enter the name of the first player");
+    std:: cin >> name1; 
+    printMsg("Enter the name of the second player"); 
+    while(std:: cin >> name2){
+        if(name2 == name1){
+            printMsg("Players should have different names. Please renter the name of the second player");
+        }
+        else{
+            playerWht.setName(name1);
+            playerBlk.setName(name2);
+            playerWht.setColor(WHITE);
+            playerBlk.setColor(BLACK);
+            break;
+        }
+    }
+}
+
+int main(){
+    setPlayers();
+    initBoard();
+    putPieces();
+    boardHistory.push_back(ChessBoard);
+
+    while(!gameOver()){
+        drawChessBoard();
+        int squareIndex = promptSquare();
+        if(unvalidSq(squareIndex)){
+        continue;
+        }
+        std:: vector<Square> moves = calcMoves(ChessBoard.at(squareIndex));
+        moves = legalise(moves, ChessBoard.at(squareIndex)); 
+        if(moves.size() == 0){
+            printMsg("CHOOSE A PIECE WITH LEGAL MOVES");
+            continue;
+        }
+        int moveNum = chooseMove(moves);
+        if(moveNum == moves.size()){ //opted to change chosen piece 
+            continue;
         }
 
+        move(ChessBoard.at(squareIndex), moves.at(moveNum));
+        setLastMove(ChessBoard.at(squareIndex), moves.at(moveNum)); // Enpassant helper funtion
+        handleChecks();
         (whiteTurn)? whiteTurn = false : whiteTurn = true;
     }
     return 0;
 }
-
-
